@@ -212,6 +212,17 @@ class RouteOptimizer {
             console.error('optimizeBtn not found');
         }
 
+        // Reverse route button
+        const reverseRouteBtn = document.getElementById('reverseRouteBtn');
+        if (reverseRouteBtn) {
+            reverseRouteBtn.addEventListener('click', () => {
+                console.log('Reverse route button clicked');
+                this.reverseRoute();
+            });
+        } else {
+            console.error('reverseRouteBtn not found');
+        }
+
         // Navigate button
         const navigateBtn = document.getElementById('navigateBtn');
         if (navigateBtn) {
@@ -555,6 +566,58 @@ class RouteOptimizer {
         });
     }
 
+    // Test method for route optimization with Czech cities (can be called from console)
+    async testCzechCitiesOptimization() {
+        console.log('Testing route optimization with Czech cities...');
+
+        // Czech cities with their approximate coordinates
+        const testCities = [
+            { address: 'Zlín', lat: 49.2265, lng: 17.6707 },
+            { address: 'Bzenec', lat: 48.9736, lng: 17.2669 },
+            { address: 'Vsetín', lat: 49.3389, lng: 17.9962 },
+            { address: 'Uherský Brod', lat: 49.0251, lng: 17.6472 },
+            { address: 'Hodonín', lat: 48.8489, lng: 17.1324 }
+        ];
+
+        // Create test stops
+        const testStops = testCities.map((city, index) => ({
+            id: index + 1,
+            address: city.address,
+            lat: city.lat,
+            lng: city.lng,
+            priority: false,
+            timeLimit: null
+        }));
+
+        console.log('Test cities:', testStops.map(s => s.address));
+
+        // Test original order
+        const originalDistance = this.calculateTotalRouteDistance(testStops);
+        console.log('Original order distance:', originalDistance.toFixed(2), 'km');
+
+        // Create a temporary instance for testing nearest neighbor
+        const tempInstance = { stops: testStops, calculateDistance: this.calculateDistance };
+        const nnRoute = this.nearestNeighborRoute.call(tempInstance);
+        const nnDistance = this.calculateTotalRouteDistance(nnRoute);
+        console.log('Nearest neighbor route:', nnRoute.map(s => s.address));
+        console.log('Nearest neighbor distance:', nnDistance.toFixed(2), 'km');
+
+        // Test 2-opt optimization
+        const optRoute = this.twoOptOptimization([...nnRoute]);
+        const optDistance = this.calculateTotalRouteDistance(optRoute);
+        console.log('2-opt optimized route:', optRoute.map(s => s.address));
+        console.log('2-opt distance:', optDistance.toFixed(2), 'km');
+
+        const improvement = originalDistance - optDistance;
+        console.log('Total improvement:', improvement.toFixed(2), 'km (', ((improvement / originalDistance) * 100).toFixed(1), '%)');
+
+        return {
+            original: { route: testStops.map(s => s.address), distance: originalDistance },
+            nearestNeighbor: { route: nnRoute.map(s => s.address), distance: nnDistance },
+            optimized: { route: optRoute.map(s => s.address), distance: optDistance }
+        };
+    }
+
     calculateDistance(lat1, lng1, lat2, lng2) {
         // Haversine formula for distance calculation
         const R = 6371; // Earth's radius in km
@@ -565,6 +628,429 @@ class RouteOptimizer {
                   Math.sin(dLng/2) * Math.sin(dLng/2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         return R * c; // Distance in km
+    }
+
+    calculateTotalRouteDistance(route) {
+        if (!route || route.length < 2) return 0;
+
+        let totalDistance = 0;
+        for (let i = 0; i < route.length - 1; i++) {
+            totalDistance += this.calculateDistance(
+                route[i].lat, route[i].lng,
+                route[i + 1].lat, route[i + 1].lng
+            );
+        }
+
+        // For round trips, add distance back to start
+        if (this.roundTrip && route.length > 2) {
+            totalDistance += this.calculateDistance(
+                route[route.length - 1].lat, route[route.length - 1].lng,
+                route[0].lat, route[0].lng
+            );
+        }
+
+        return totalDistance;
+    }
+
+    fallbackOptimizeStops() {
+        console.log('Using fallback optimization: 2-opt algorithm with full route consideration');
+
+        if (this.stops.length < 2) {
+            console.log('Not enough stops for optimization');
+            return;
+        }
+
+        const originalOrder = [...this.stops];
+        const originalDistance = this.calculateCompleteRouteDistance();
+        console.log('Original order:', originalOrder.map(s => s.address));
+        console.log('Original total distance:', originalDistance.toFixed(2), 'km');
+
+        // Start with nearest neighbor as initial solution
+        const initialRoute = this.nearestNeighborRoute();
+        // Temporarily set stops to initial route to calculate complete distance
+        const originalStops = this.stops;
+        this.stops = initialRoute;
+        const initialDistance = this.calculateCompleteRouteDistance();
+        this.stops = originalStops;
+        console.log('Initial route from nearest neighbor:', initialRoute.map(s => s.address));
+        console.log('Initial distance:', initialDistance.toFixed(2), 'km');
+
+        // Apply 2-opt improvement
+        const optimizedRoute = this.twoOptOptimization(initialRoute);
+        // Temporarily set stops to optimized route to calculate complete distance
+        this.stops = optimizedRoute;
+        const optimizedDistance = this.calculateCompleteRouteDistance();
+        this.stops = originalStops;
+        console.log('Optimized route from full route optimization:', optimizedRoute.map(s => s.address));
+        console.log('Optimized distance:', optimizedDistance.toFixed(2), 'km');
+
+        const improvement = originalDistance - optimizedDistance;
+        console.log('Total improvement:', improvement.toFixed(2), 'km (', ((improvement / originalDistance) * 100).toFixed(1), '%)');
+
+        this.stops = optimizedRoute;
+
+        // Update the UI to reflect the new order
+        this.updateStopsList();
+
+        // Check if the order actually changed
+        const orderChanged = !originalOrder.every((stop, index) => stop.id === optimizedRoute[index].id);
+        console.log('Order was changed:', orderChanged);
+        console.log('Final stops order:', this.stops.map(s => s.address));
+    }
+
+    optimizeFullRoute() {
+        // Create a full route array including starting point for optimization
+        const fullRoute = this.startingPoint ? [this.startingPoint, ...this.stops] : [...this.stops];
+
+        if (fullRoute.length < 3) {
+            return this.stops; // Not enough points for meaningful optimization
+        }
+
+        console.log('Optimizing full route:', fullRoute.map(p => p.address || 'Starting Point'));
+
+        // Start with nearest neighbor from starting point
+        const initialRoute = this.nearestNeighborFromStart(fullRoute);
+        console.log('Initial full route:', initialRoute.map(p => p.address || 'Starting Point'));
+
+        // Apply 2-opt to the stops only (keep starting point fixed)
+        const stopsOnly = initialRoute.slice(this.startingPoint ? 1 : 0);
+        const optimizedStops = this.twoOptOptimization([...stopsOnly]);
+
+        return optimizedStops;
+    }
+
+    nearestNeighborFromStart(fullRoute) {
+        if (!this.startingPoint) {
+            return this.nearestNeighborRoute();
+        }
+
+        // Start from the warehouse (first point)
+        const startPoint = fullRoute[0];
+        const stopsOnly = fullRoute.slice(1);
+
+        const optimizedRoute = [startPoint];
+        const remainingStops = [...stopsOnly];
+
+        // Nearest neighbor algorithm starting from warehouse with priority consideration
+        while (remainingStops.length > 0) {
+            const currentPoint = optimizedRoute[optimizedRoute.length - 1];
+            let nearestIndex = 0;
+            let nearestWeightedDistance = this.calculateWeightedDistance(
+                currentPoint, remainingStops[0]
+            );
+
+            // Find the nearest remaining stop (considering priority)
+            for (let i = 1; i < remainingStops.length; i++) {
+                const weightedDistance = this.calculateWeightedDistance(
+                    currentPoint, remainingStops[i]
+                );
+                if (weightedDistance < nearestWeightedDistance) {
+                    nearestWeightedDistance = weightedDistance;
+                    nearestIndex = i;
+                }
+            }
+
+            // Add the nearest stop to the route
+            optimizedRoute.push(remainingStops[nearestIndex]);
+            remainingStops.splice(nearestIndex, 1);
+        }
+
+        // Return only the stops part (without the starting point)
+        return optimizedRoute.slice(1);
+    }
+
+    nearestNeighborRoute() {
+        // Start from the first stop
+        const optimizedStops = [this.stops[0]];
+        const remainingStops = [...this.stops.slice(1)];
+
+        // Nearest neighbor algorithm with priority consideration
+        while (remainingStops.length > 0) {
+            const currentStop = optimizedStops[optimizedStops.length - 1];
+            let nearestIndex = 0;
+            let nearestWeightedDistance = this.calculateWeightedDistance(
+                currentStop, remainingStops[0]
+            );
+
+            // Find the nearest remaining stop (considering priority)
+            for (let i = 1; i < remainingStops.length; i++) {
+                const weightedDistance = this.calculateWeightedDistance(
+                    currentStop, remainingStops[i]
+                );
+                if (weightedDistance < nearestWeightedDistance) {
+                    nearestWeightedDistance = weightedDistance;
+                    nearestIndex = i;
+                }
+            }
+
+            // Add the nearest stop to the optimized route
+            optimizedStops.push(remainingStops[nearestIndex]);
+            remainingStops.splice(nearestIndex, 1);
+        }
+
+        return optimizedStops;
+    }
+
+    calculateWeightedDistance(fromStop, toStop) {
+        const baseDistance = this.calculateDistance(
+            fromStop.lat, fromStop.lng,
+            toStop.lat, toStop.lng
+        );
+
+        // Priority stops get a bonus (negative weight) to appear earlier
+        // This effectively reduces their distance by 20% making them more likely to be chosen
+        const priorityBonus = toStop.priority ? -0.2 : 0;
+
+        return baseDistance * (1 + priorityBonus);
+    }
+
+    twoOptOptimization(route) {
+        let improved = true;
+        let iterations = 0;
+        const maxIterations = 1000; // Prevent infinite loops
+
+        while (improved && iterations < maxIterations) {
+            improved = false;
+            iterations++;
+
+            // Try all possible 2-opt swaps
+            for (let i = 1; i < route.length - 1; i++) {
+                for (let j = i + 1; j < route.length; j++) {
+                    // Calculate current complete route distance and priority score
+                    const originalStops = this.stops;
+                    this.stops = route;
+                    const currentTotalDistance = this.calculateCompleteRouteDistance();
+                    const currentPriorityScore = this.calculatePriorityScore(route);
+                    this.stops = originalStops;
+
+                    // Create a copy of the route and apply the 2-opt swap
+                    const testRoute = [...route];
+                    const reversedSegment = testRoute.slice(i, j + 1).reverse();
+                    testRoute.splice(i, j - i + 1, ...reversedSegment);
+
+                    // Calculate new complete route distance and priority score
+                    this.stops = testRoute;
+                    const newTotalDistance = this.calculateCompleteRouteDistance();
+                    const newPriorityScore = this.calculatePriorityScore(testRoute);
+                    this.stops = originalStops;
+
+                    // Prefer routes that either:
+                    // 1. Have better distance, or
+                    // 2. Have same distance but better priority score
+                    const distanceImproved = newTotalDistance < currentTotalDistance;
+                    const priorityImproved = (Math.abs(newTotalDistance - currentTotalDistance) < 0.1) &&
+                                           (newPriorityScore > currentPriorityScore);
+
+                    if (distanceImproved || priorityImproved) {
+                        route.splice(i, j - i + 1, ...reversedSegment);
+                        improved = true;
+                        const reason = distanceImproved ?
+                            `saved ${(currentTotalDistance - newTotalDistance).toFixed(2)} km` :
+                            `improved priority score by ${newPriorityScore - currentPriorityScore}`;
+                        console.log(`2-opt improvement at iteration ${iterations}: swapped ${i} to ${j}, ${reason}`);
+                        break;
+                    }
+                }
+                if (improved) break;
+            }
+        }
+
+        console.log(`2-opt completed after ${iterations} iterations`);
+        return route;
+    }
+
+    calculatePriorityScore(route) {
+        // Calculate a score based on how early priority stops appear
+        // Higher score = better (priority stops appear earlier)
+        let score = 0;
+        for (let i = 0; i < route.length; i++) {
+            if (route[i].priority) {
+                // Priority stops get higher score for appearing earlier
+                score += (route.length - i) * 10;
+            }
+        }
+        return score;
+    }
+
+    async optimizeRegularRouteOrder() {
+        try {
+            // Prepare coordinates for trip optimization (without roundtrip)
+            let coordinates = [];
+
+            if (this.startingPoint) {
+                coordinates.push(`${this.startingPoint.lng},${this.startingPoint.lat}`);
+            }
+
+            // Add all stops
+            coordinates.push(...this.stops.map(stop => `${stop.lng},${stop.lat}`));
+
+            // Remove duplicates
+            coordinates = this.removeDuplicateCoordinates(coordinates);
+
+            if (coordinates.length < 2) {
+                console.log('Not enough coordinates for optimization');
+                return;
+            }
+
+            // Use OSRM trip service for optimization - allow full reordering
+            const url = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=true`;
+
+            console.log('Requesting route optimization from:', url);
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.error('OSRM optimization failed');
+                return;
+            }
+
+            const data = await response.json();
+            console.log('Optimization response:', data);
+            console.log('Request URL:', url);
+            console.log('Coordinates sent:', coordinates);
+
+            if (data.trips && data.trips.length > 0 && data.trips[0].waypoints) {
+                console.log('Original stops order:', this.stops.map(s => s.address));
+                console.log('OSRM waypoints:', data.trips[0].waypoints);
+
+                // Check if waypoints are actually reordered
+                const waypointOrder = data.trips[0].waypoints.map(wp => wp.waypoint_index);
+                console.log('Waypoint order from OSRM:', waypointOrder);
+                console.log('Original coordinates sent:', coordinates);
+
+                // If waypoints are in original order (0,1,2,3...), OSRM didn't optimize
+                const isOptimized = !waypointOrder.every((index, i) => index === i);
+                console.log('Route was optimized by OSRM:', isOptimized);
+
+                // Always apply our optimization as final step to ensure best result
+                console.log('Applying final optimization to ensure best route...');
+                this.fallbackOptimizeStops();
+
+                // Reorder stops based on optimized waypoints
+                const optimizedStops = [];
+                const usedStopIds = new Set();
+
+                // Process all waypoints (OSRM can now reorder everything)
+                const waypointsToProcess = data.trips[0].waypoints;
+
+                for (const waypoint of waypointsToProcess) {
+                    const wpCoord = {
+                        lat: waypoint.location[1],
+                        lng: waypoint.location[0]
+                    };
+
+                    let closestStop = null;
+                    let minDistance = Infinity;
+
+                    for (const stop of this.stops) {
+                        if (usedStopIds.has(stop.id)) continue;
+
+                        const distance = this.calculateDistance(
+                            stop.lat, stop.lng,
+                            wpCoord.lat, wpCoord.lng
+                        );
+
+                        if (distance < minDistance && distance < 1.0) { // Within 1 km
+                            minDistance = distance;
+                            closestStop = stop;
+                        }
+                    }
+
+                    if (closestStop) {
+                        optimizedStops.push(closestStop);
+                        usedStopIds.add(closestStop.id);
+                        console.log(`Mapped waypoint ${waypoint.waypoint_index} to stop: ${closestStop.address}`);
+                    } else {
+                        console.warn(`Could not map waypoint ${waypoint.waypoint_index} to any stop`);
+                    }
+                }
+
+                // Add any remaining stops that weren't matched
+                for (const stop of this.stops) {
+                    if (!usedStopIds.has(stop.id)) {
+                        optimizedStops.push(stop);
+                        console.log(`Added unmapped stop: ${stop.address}`);
+                    }
+                }
+
+                if (optimizedStops.length === this.stops.length) {
+                    this.stops = optimizedStops;
+                    console.log('Stops reordered for regular route optimization:', this.stops.map(s => s.address));
+                } else {
+                    console.warn('Stop count mismatch, keeping original order');
+                }
+            } else {
+                console.warn('No waypoints returned from OSRM trip service');
+                // Fallback: implement simple nearest neighbor optimization
+                this.fallbackOptimizeStops();
+            }
+
+        } catch (error) {
+            console.error('Error optimizing regular route:', error);
+        }
+    }
+
+    async reorderStopsByOptimizedRoute() {
+        if (!this.optimizedRoute) return;
+
+        try {
+            // First, try to reorder based on OSRM result if available
+            if (this.roundTrip && this.optimizedRoute.waypoints) {
+                // For round trips, OSRM trip service returns waypoints in optimized order
+                // Map the optimized waypoints back to our stops
+                const waypointCoords = this.optimizedRoute.waypoints.map(wp => ({
+                    lat: wp.location[1],
+                    lng: wp.location[0]
+                }));
+
+                // Create a new stops array in the optimized order
+                const optimizedStops = [];
+                const usedStopIds = new Set();
+
+                for (const wpCoord of waypointCoords) {
+                    // Find the closest unused stop to this waypoint
+                    let closestStop = null;
+                    let minDistance = Infinity;
+
+                    for (const stop of this.stops) {
+                        if (usedStopIds.has(stop.id)) continue;
+
+                        const distance = this.calculateDistance(
+                            stop.lat, stop.lng,
+                            wpCoord.lat, wpCoord.lng
+                        );
+
+                        if (distance < minDistance && distance < 0.1) { // Within 100 meters
+                            minDistance = distance;
+                            closestStop = stop;
+                        }
+                    }
+
+                    if (closestStop) {
+                        optimizedStops.push(closestStop);
+                        usedStopIds.add(closestStop.id);
+                    }
+                }
+
+                // If we couldn't map all waypoints, keep remaining stops in original order
+                for (const stop of this.stops) {
+                    if (!usedStopIds.has(stop.id)) {
+                        optimizedStops.push(stop);
+                    }
+                }
+
+                this.stops = optimizedStops;
+                console.log('Stops reordered based on OSRM round trip result:', this.stops.map(s => s.address));
+            }
+
+            // Always apply our optimization as final step to ensure best result
+            console.log('Applying final optimization to ensure best route...');
+            this.fallbackOptimizeStops();
+
+            // UI is already updated by fallbackOptimizeStops()
+
+        } catch (error) {
+            console.error('Error reordering stops:', error);
+        }
     }
 
     generateUserId() {
@@ -694,7 +1180,7 @@ class RouteOptimizer {
             // Generate shareable URL
             const shareUrl = `${window.location.origin}?route=${route.share_token || routeId}`;
             await navigator.clipboard.writeText(shareUrl);
-            alert(`Odkaz na trasu zkopírován do schránky:\n${shareUrl}`);
+            // Share URL copied to clipboard
         } catch (error) {
             console.error('Error sharing route:', error);
             alert('Chyba při sdílení trasy');
@@ -718,7 +1204,7 @@ class RouteOptimizer {
 
             // Load the shared route
             this.loadRouteFromData(data);
-            alert(`Sdílená trasa "${data.name}" byla načtena.`);
+            // Shared route loaded successfully
         } catch (error) {
             console.error('Error loading shared route:', error);
             alert('Chyba při načítání sdílené trasy');
@@ -856,7 +1342,7 @@ class RouteOptimizer {
             this.savedRoutes.unshift(savedRoute); // Add to beginning
             this.updateSavedRoutesList();
 
-            alert(`Trasa "${routeData.name}" byla úspěšně uložena.`);
+            // Route saved successfully - visible in saved routes list
         } catch (error) {
             console.error('Error saving route:', error);
             alert('Chyba při ukládání trasy. Zkuste to znovu.');
@@ -993,7 +1479,7 @@ class RouteOptimizer {
         }
 
         this.loadRouteFromData(route);
-        alert(`Trasa "${route.name}" byla načtena.`);
+        // Route loaded successfully - visible in UI
 
         // Track usage
         this.trackRouteUsage(routeId, 'load');
@@ -1019,8 +1505,6 @@ class RouteOptimizer {
         if (roundTripCheckbox) {
             roundTripCheckbox.checked = this.roundTrip;
         }
-
-        alert(`Trasa "${route.name}" byla načtena.`);
     }
 
     async deleteSavedRoute(routeId) {
@@ -1035,7 +1519,7 @@ class RouteOptimizer {
             await this.deleteRouteFromSupabase(routeId);
             this.savedRoutes = this.savedRoutes.filter(r => r.id !== routeId);
             this.updateSavedRoutesList();
-            alert(`Trasa "${route.name}" byla smazána.`);
+            // Route deleted successfully - removed from saved routes list
         } catch (error) {
             alert('Chyba při mazání trasy. Zkuste to znovu.');
         }
@@ -1130,10 +1614,31 @@ class RouteOptimizer {
         const emptyState = document.getElementById('emptyState');
         const stopCount = document.getElementById('stopCount');
 
+        console.log('updateStopsList called with stops:', this.stops.map(s => s.address));
+        console.log('DOM elements found - list:', !!list, 'emptyState:', !!document.getElementById('emptyState'), 'stopCount:', !!document.getElementById('stopCount'));
+
+        if (!list) {
+            console.error('stopsList element not found!');
+            return;
+        }
+
+        // Add visual feedback that update is happening
+        list.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        list.style.transform = 'scale(1.01)';
+        setTimeout(() => {
+            list.style.backgroundColor = '';
+            list.style.transform = '';
+        }, 300);
+
         list.innerHTML = '';
 
         // Update stop count
-        stopCount.textContent = this.stops.length;
+        if (stopCount) {
+            stopCount.textContent = this.stops.length;
+        }
+
+        // Update route analytics
+        this.updateRouteAnalytics();
 
         // Show/hide empty state
         if (this.stops.length === 0) {
@@ -1224,18 +1729,89 @@ class RouteOptimizer {
         }
     }
 
+    updateRouteAnalytics() {
+        const analyticsDiv = document.getElementById('routeAnalytics');
+        if (!analyticsDiv) return;
+
+        if (this.stops.length < 2) {
+            analyticsDiv.style.display = 'none';
+            return;
+        }
+
+        // Calculate complete route distance including warehouse
+        const totalDistance = this.calculateCompleteRouteDistance();
+        const estimatedTime = totalDistance / 50 * 60; // Assuming 50 km/h average speed
+        const timeText = estimatedTime > 60 ?
+            `${Math.floor(estimatedTime / 60)}h ${Math.floor(estimatedTime % 60)}min` :
+            `${Math.floor(estimatedTime)}min`;
+
+        analyticsDiv.innerHTML = `
+            <div class="analytics-item">
+                <span class="analytics-label">Vzdálenost:</span>
+                <span class="analytics-value">${totalDistance.toFixed(1)} km</span>
+            </div>
+            <div class="analytics-item">
+                <span class="analytics-label">Odhadovaný čas:</span>
+                <span class="analytics-value">${timeText}</span>
+            </div>
+        `;
+        analyticsDiv.style.display = 'flex';
+    }
+
+    calculateCompleteRouteDistance() {
+        if (!this.stops || this.stops.length < 2) return 0;
+
+        let totalDistance = 0;
+
+        // Add distance from warehouse to first stop (if warehouse is set)
+        if (this.startingPoint) {
+            totalDistance += this.calculateDistance(
+                this.startingPoint.lat, this.startingPoint.lng,
+                this.stops[0].lat, this.stops[0].lng
+            );
+        }
+
+        // Add distances between all stops
+        for (let i = 0; i < this.stops.length - 1; i++) {
+            totalDistance += this.calculateDistance(
+                this.stops[i].lat, this.stops[i].lng,
+                this.stops[i + 1].lat, this.stops[i + 1].lng
+            );
+        }
+
+        // Add distance from last stop back to warehouse (for round trips)
+        if (this.roundTrip && this.startingPoint) {
+            totalDistance += this.calculateDistance(
+                this.stops[this.stops.length - 1].lat, this.stops[this.stops.length - 1].lng,
+                this.startingPoint.lat, this.startingPoint.lng
+            );
+        }
+
+        return totalDistance;
+    }
+
     updateButtons() {
         const optimizeBtn = document.getElementById('optimizeBtn');
         const saveRouteBtn = document.getElementById('saveRouteBtn');
+        const reverseRouteBtn = document.getElementById('reverseRouteBtn');
         const navigateBtn = document.getElementById('navigateBtn');
 
         optimizeBtn.disabled = this.stops.length < 2;
         saveRouteBtn.disabled = this.stops.length < 2;
+        reverseRouteBtn.disabled = this.stops.length < 2;
         navigateBtn.disabled = !this.optimizedRoute;
+
+        // Show/hide reverse button after optimization
+        if (this.optimizedRoute && this.stops.length >= 2) {
+            reverseRouteBtn.style.display = 'flex';
+        } else {
+            reverseRouteBtn.style.display = 'none';
+        }
 
         // Update button texts
         optimizeBtn.textContent = 'Optimalizovat trasu';
         saveRouteBtn.textContent = 'Uložit trasu';
+        reverseRouteBtn.textContent = '↩️ Obrátit trasu';
         navigateBtn.textContent = 'Zahájit navigaci';
     }
 
@@ -1395,10 +1971,10 @@ class RouteOptimizer {
         }, 5000);
     }
 
-async optimizeRoute() {
+    async optimizeRoute() {
         console.log('optimizeRoute called with stops:', this.stops.length);
         console.log('Stops:', this.stops);
-        
+
         if (this.stops.length < 2) {
             console.log('Not enough stops for optimization');
             alert('Pro optimalizaci trasy potřebujete alespoň 2 zastávky.');
@@ -1406,21 +1982,50 @@ async optimizeRoute() {
         }
 
         this.showLoading(true);
-        
+
         try {
+            // Calculate original route distance before optimization
+            const originalDistance = this.calculateCompleteRouteDistance();
+            console.log('Original route distance:', originalDistance.toFixed(2), 'km');
+
             console.log('Starting route calculation...');
             this.optimizedRoute = await this.calculateOptimalRoute();
             console.log('Route calculated successfully');
 
+            // Reorder stops based on optimized route
+            if (this.optimizedRoute) {
+                await this.reorderStopsByOptimizedRoute();
+                console.log('Stops reordered based on optimization');
+
+                // Calculate optimized route distance
+                const optimizedDistance = this.calculateCompleteRouteDistance();
+                const savings = originalDistance - optimizedDistance;
+                const savingsPercent = originalDistance > 0 ? (savings / originalDistance) * 100 : 0;
+
+                console.log('Optimized route distance:', optimizedDistance.toFixed(2), 'km');
+                console.log('Distance savings:', savings.toFixed(2), 'km (', savingsPercent.toFixed(1), '%)');
+
+                // Estimate time savings (assuming 50 km/h average speed)
+                const timeSavings = savings / 50 * 60; // in minutes
+                const timeSavingsText = timeSavings > 60 ?
+                    `${Math.floor(timeSavings / 60)}h ${Math.floor(timeSavings % 60)}min` :
+                    `${Math.floor(timeSavings)}min`;
+
+                // Optimization completed successfully - results visible in UI and console
+            }
+
             console.log('Updating buttons...');
             this.updateButtons();
-            
+
             console.log('Route optimization completed successfully');
         } catch (error) {
             console.error('Route optimization failed:', error);
             alert('Optimalizace trasy selhala. Zkuste to prosím znovu.');
         } finally {
             this.showLoading(false);
+            // Ensure UI is updated after loading is hidden
+            this.updateStopsList();
+            this.updateRouteAnalytics();
         }
     }
 
@@ -1547,6 +2152,31 @@ async optimizeRoute() {
 
 
 
+    reverseRoute() {
+        if (this.stops.length < 2) {
+            alert('Pro obrácení trasy potřebujete alespoň 2 zastávky.');
+            return;
+        }
+
+        console.log('Reversing route order...');
+        console.log('Original order:', this.stops.map(s => s.address));
+
+        // Reverse the stops array
+        this.stops.reverse();
+
+        console.log('Reversed order:', this.stops.map(s => s.address));
+
+        // Update the UI
+        this.updateStopsList();
+        this.updateRouteAnalytics();
+
+        // Show updated distance in console
+        const reversedDistance = this.calculateCompleteRouteDistance();
+        console.log('Reversed route distance:', reversedDistance.toFixed(2), 'km');
+
+        console.log('Route reversed successfully');
+    }
+
     startNavigation() {
         if (!this.optimizedRoute || this.stops.length < 2) return;
 
@@ -1640,9 +2270,7 @@ async optimizeRoute() {
 
         if (batchIndex === 0) {
             if (this.roundTrip) {
-                setTimeout(() => {
-                    alert(`Kruhový objezd: Trasa vás zavede zpět na výchozí bod.`);
-                }, 1000);
+                // Round trip navigation started - no alert needed
             } else if (this.stops.length > 10) {
                 const totalStops = this.startingPoint ? this.stops.length + 1 : this.stops.length;
                 const batchCount = Math.ceil(totalStops / 8);
