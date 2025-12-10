@@ -1637,8 +1637,7 @@ class RouteOptimizer {
             stopCount.textContent = this.stops.length;
         }
 
-        // Update route analytics
-        this.updateRouteAnalytics();
+
 
         // Show/hide empty state
         if (this.stops.length === 0) {
@@ -1729,34 +1728,7 @@ class RouteOptimizer {
         }
     }
 
-    updateRouteAnalytics() {
-        const analyticsDiv = document.getElementById('routeAnalytics');
-        if (!analyticsDiv) return;
 
-        if (this.stops.length < 2) {
-            analyticsDiv.style.display = 'none';
-            return;
-        }
-
-        // Calculate complete route distance including warehouse
-        const totalDistance = this.calculateCompleteRouteDistance();
-        const estimatedTime = totalDistance / 50 * 60; // Assuming 50 km/h average speed
-        const timeText = estimatedTime > 60 ?
-            `${Math.floor(estimatedTime / 60)}h ${Math.floor(estimatedTime % 60)}min` :
-            `${Math.floor(estimatedTime)}min`;
-
-        analyticsDiv.innerHTML = `
-            <div class="analytics-item">
-                <span class="analytics-label">Vzdálenost:</span>
-                <span class="analytics-value">${totalDistance.toFixed(1)} km</span>
-            </div>
-            <div class="analytics-item">
-                <span class="analytics-label">Odhadovaný čas:</span>
-                <span class="analytics-value">${timeText}</span>
-            </div>
-        `;
-        analyticsDiv.style.display = 'flex';
-    }
 
     calculateCompleteRouteDistance() {
         if (!this.stops || this.stops.length < 2) return 0;
@@ -2025,7 +1997,6 @@ class RouteOptimizer {
             this.showLoading(false);
             // Ensure UI is updated after loading is hidden
             this.updateStopsList();
-            this.updateRouteAnalytics();
         }
     }
 
@@ -2168,7 +2139,6 @@ class RouteOptimizer {
 
         // Update the UI
         this.updateStopsList();
-        this.updateRouteAnalytics();
 
         // Show updated distance in console
         const reversedDistance = this.calculateCompleteRouteDistance();

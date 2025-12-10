@@ -246,19 +246,20 @@
         }
 
         .route-options {
-            margin-top: var(--spacing-md);
-            padding-top: var(--spacing-md);
-            border-top: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            margin: 0 var(--spacing-sm);
         }
 
         .option-checkbox {
             display: flex;
             align-items: center;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 500;
             color: var(--text-primary);
             user-select: none;
+            white-space: nowrap;
         }
 
         .option-checkbox input {
@@ -390,19 +391,30 @@
         }
 
         .add-btn {
-            padding: 12px var(--spacing-md);
+            padding: 12px;
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
+            color: white !important;
             border: none;
             border-radius: var(--radius-large);
-            font-size: 14px;
+            font-size: 18px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: var(--shadow-4);
-            min-width: 120px;
+            min-width: 44px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             position: relative;
             overflow: hidden;
+        }
+
+        .add-icon {
+            /* Force emoji to be white */
+            filter: brightness(0) invert(1);
+            display: block;
         }
 
         .add-btn::before {
@@ -1261,8 +1273,29 @@
             }
 
             .input-group {
-                flex-direction: column;
+                flex-direction: row;
                 gap: var(--spacing-sm);
+            }
+
+            .start-point-input-group {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: var(--spacing-xs);
+                align-items: center;
+            }
+
+            .start-point-input {
+                flex: 1;
+                min-width: 0; /* Allow shrinking */
+            }
+
+            .route-options {
+                flex-shrink: 0;
+                margin: 0 var(--spacing-xs);
+            }
+
+            .use-current-location-btn {
+                flex-shrink: 0;
             }
 
             .add-btn {
@@ -1414,14 +1447,14 @@
                         >
                         <div id="startPointAutocomplete" class="autocomplete-dropdown"></div>
                     </div>
+                    <div class="route-options">
+                        <label class="option-checkbox">
+                            <input type="checkbox" id="roundTripCheckbox">
+                            <span class="checkmark"></span>
+                            Vrátit se na začátek
+                        </label>
+                    </div>
                     <button id="useCurrentLocationBtn" class="use-current-location-btn">📍</button>
-                </div>
-                <div class="route-options">
-                    <label class="option-checkbox">
-                        <input type="checkbox" id="roundTripCheckbox">
-                        <span class="checkmark"></span>
-                        Vrátit se na začátek
-                    </label>
                 </div>
             </section>
 
@@ -1442,7 +1475,7 @@
                         >
                         <div id="stopAutocomplete" class="autocomplete-dropdown"></div>
                     </div>
-                    <button id="addStopBtn" class="add-btn">Přidat Zastávku</button>
+                    <button id="addStopBtn" class="add-btn" title="Přidat Zastávku"><span class="add-icon">➕</span></button>
                 </div>
 
                 <div id="bulkInput" class="bulk-input-group" style="display: none;">
@@ -1464,9 +1497,7 @@
                     </div>
                 </div>
 
-                <div class="route-analytics" id="routeAnalytics" style="display: none;">
-                    <!-- Route analytics will be populated dynamically -->
-                </div>
+
 
                 <div class="stops-list" id="stopsList">
                     <!-- Zastávky budou přidány dynamicky -->
