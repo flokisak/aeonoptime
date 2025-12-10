@@ -1703,6 +1703,9 @@ class RouteOptimizer {
             this.stops.forEach((stop, index) => {
                 const item = document.createElement('div');
                 item.className = `stop-item ${stop.priority ? 'priority' : ''}`;
+                // Drag and drop disabled for now
+                // item.draggable = true;
+                // item.setAttribute('data-stop-index', index);
 
                 const leftSection = document.createElement('div');
                 leftSection.className = 'stop-left';
@@ -1778,6 +1781,9 @@ class RouteOptimizer {
                     this.togglePriority(parseInt(e.target.dataset.id));
                 });
             });
+
+            // Add drag and drop functionality
+            // this.setupDragAndDrop(list); // Completely disabled for now
         }
     }
 
@@ -2552,6 +2558,69 @@ class RouteOptimizer {
         });
 
         return filtered.reduce((total, record) => total + record.earnings, 0);
+    }
+
+    setupDragAndDrop(list) {
+        let draggedElement = null;
+
+        const stopItems = list.querySelectorAll('.stop-item');
+
+        stopItems.forEach(item => {
+            // Only enable drag and drop on desktop (touch devices have issues)
+            if (!('ontouchstart' in window)) {
+                // Drag start
+                item.addEventListener('dragstart', (e) => {
+                    // Don't start drag if clicking on buttons
+                    if (e.target.closest('.priority-btn') || e.target.closest('.remove-btn')) {
+                        e.preventDefault();
+                        return;
+                    }
+
+                    draggedElement = item;
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                // Drag end
+                item.addEventListener('dragend', (e) => {
+                    item.classList.remove('dragging');
+                    draggedElement = null;
+                });
+
+                // Drag over
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+
+                // Drop
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+
+                    if (draggedElement && draggedElement !== item) {
+                        const draggedIndex = parseInt(draggedElement.getAttribute('data-stop-index'));
+                        const targetIndex = parseInt(item.getAttribute('data-stop-index'));
+
+                        // Simple reordering logic
+                        const draggedStop = this.stops[draggedIndex];
+                        this.stops.splice(draggedIndex, 1);
+
+                        // Insert at target position
+                        const insertIndex = targetIndex > draggedIndex ? targetIndex : targetIndex + 1;
+                        this.stops.splice(insertIndex, 0, draggedStop);
+
+                        // Update UI
+                        this.updateStopsList();
+
+                        // Re-optimize the route after manual reordering
+                        console.log('Route manually reordered, triggering re-optimization...');
+                        setTimeout(() => {
+                            this.optimizeRoute();
+                        }, 100);
+                    }
+                });
+            }
+        });
     }
 
     getMonthlyDistance(month, year) {

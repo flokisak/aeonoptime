@@ -524,13 +524,39 @@
             align-items: center;
             padding: var(--spacing-md);
             border: 2px solid var(--border-light);
-            border-radius: var(--radius-xlarge);
+            border-radius: var(--radius-large);
             margin-bottom: var(--spacing-sm);
-            background: var(--surface-elevated);
-            box-shadow: var(--shadow-2);
+            background: var(--surface);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
+            box-shadow: var(--shadow-2);
+            cursor: grab;
         }
+
+        .stop-item:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-4), var(--shadow-blue);
+            transform: translateY(-2px);
+        }
+
+        .stop-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            box-shadow: var(--shadow-8);
+            cursor: grabbing;
+        }
+
+        /* Prevent dragging when clicking buttons */
+        .stop-item .priority-btn,
+        .stop-item .remove-btn {
+            pointer-events: auto;
+        }
+
+        .stop-item .priority-btn:active,
+        .stop-item .remove-btn:active {
+            pointer-events: none;
+        }
+
+
 
         .stop-item::before {
             content: '';
@@ -1781,8 +1807,8 @@
     <script>
         // Environment variables injected at build time
         window.ENV = {
-            SUPABASE_URL: 'https://sgrvxuepflnxhhwxkqkz.supabase.co',
-            SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNncnZ4dWVwZmxueGhod3hrcWt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNjgyMzYsImV4cCI6MjA4MDk0NDIzNn0.lHmwYOaBXU3lwRZrLbhvbPVDC0nZUT4nJpzSUnwQchg'
+            SUPABASE_URL: '${VITE_SUPABASE_URL}',
+            SUPABASE_ANON_KEY: '${VITE_SUPABASE_ANON_KEY}'
         };
     </script>
     <script src="https://unpkg.com/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>

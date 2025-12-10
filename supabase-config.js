@@ -5,17 +5,22 @@ const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIs
 
 // Initialize Supabase immediately
 if (typeof window !== 'undefined') {
+    // Set defaults
+    window.supabaseReady = false;
+    window.supabaseClient = null;
+
     try {
         if (window.supabase && window.supabase.createClient) {
             window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             window.supabaseReady = true;
             console.log('Supabase client initialized successfully');
         } else {
-            console.error('Supabase library not loaded - createClient not available');
+            console.log('Supabase library not loaded - running in offline mode');
             window.supabaseReady = false;
         }
     } catch (error) {
         console.error('Error initializing Supabase client:', error);
+        console.log('Running in offline mode');
         window.supabaseReady = false;
     }
 }
