@@ -2,12 +2,15 @@ class RouteOptimizer {
     constructor() {
         this.stops = [];
         this.startingPoint = null;
-        this.optimizedRoute = null;
         this.roundTrip = false;
+        this.optimizedRoute = null;
         this.savedRoutes = [];
-        this.userId = this.generateUserId(); // Anonymous user ID
-        this.isOnline = navigator.onLine;
-        
+        this.userId = this.generateUserId();
+        this.currentRouteId = null; // Track current loaded route
+        this.currentTracking = null; // Track current navigation session
+        this.trackingData = []; // Store tracking history
+        this.userSettings = { kmRate: 3.00, currency: 'CZK' }; // Default settings
+
         this.init();
     }
 
@@ -232,6 +235,53 @@ class RouteOptimizer {
             });
         } else {
             console.error('navigateBtn not found');
+        }
+
+        // Tracking section
+        const toggleTrackingBtn = document.getElementById('toggleTrackingBtn');
+        if (toggleTrackingBtn) {
+            toggleTrackingBtn.addEventListener('click', () => {
+                this.toggleTrackingSection();
+            });
+        }
+
+        const kmRateInput = document.getElementById('kmRateInput');
+        if (kmRateInput) {
+            kmRateInput.value = this.userSettings.kmRate;
+            kmRateInput.addEventListener('change', (e) => {
+                this.userSettings.kmRate = parseFloat(e.target.value) || 3.00;
+                localStorage.setItem('userSettings', JSON.stringify(this.userSettings));
+                this.saveUserSettings();
+                this.updateTrackingStats();
+            });
+        }
+
+        // Month selector
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        if (monthSelect && yearSelect) {
+            const now = new Date();
+            monthSelect.value = now.getMonth();
+            yearSelect.value = now.getFullYear();
+
+            const updateMonthView = () => {
+                this.updateTrackingStats();
+                this.updateTrackingHistory();
+            };
+
+            monthSelect.addEventListener('change', updateMonthView);
+            yearSelect.addEventListener('change', updateMonthView);
+        }
+
+        const endRouteBtn = document.getElementById('endRouteBtn');
+        if (endRouteBtn) {
+            endRouteBtn.addEventListener('click', () => {
+                const record = this.stopRouteTracking();
+                if (record) {
+                    alert(`Trasa ukončena!\nUjeté km: ${record.distanceDriven.toFixed(1)}\nVýdělek: ${record.earnings.toFixed(0)} CZK`);
+                }
+                this.updateTrackingUI();
+            });
         }
         
         // Mode toggle buttons
@@ -1595,6 +1645,9 @@ class RouteOptimizer {
         this.updateStopsList();
         this.saveToStorage();
         this.updateButtons();
+
+        // Load tracking data and settings
+        this.loadTrackingData();
     }
 
     togglePriority(id) {
@@ -1780,11 +1833,7 @@ class RouteOptimizer {
             reverseRouteBtn.style.display = 'none';
         }
 
-        // Update button texts
-        optimizeBtn.textContent = 'Optimalizovat trasu';
-        saveRouteBtn.textContent = 'Uložit trasu';
-        reverseRouteBtn.textContent = '↩️ Obrátit trasu';
-        navigateBtn.textContent = 'Zahájit navigaci';
+        // Update button icons (keep existing HTML icons)
     }
 
     async parseBulkText() {
@@ -2150,6 +2199,10 @@ class RouteOptimizer {
     startNavigation() {
         if (!this.optimizedRoute || this.stops.length < 2) return;
 
+        // Start tracking this route
+        this.startRouteTracking(this.currentRouteId);
+        this.updateTrackingUI(); // Update UI to show end route button
+
         // For round trips, use the optimized waypoint order from OSRM trip service
         let routeStops = [];
 
@@ -2341,6 +2394,289 @@ class RouteOptimizer {
 
             console.log('Applied mobile button positioning fixes');
         }
+    }
+
+    // Tracking functionality
+    startRouteTracking(routeId) {
+        this.currentTracking = {
+            routeId: routeId,
+            startTime: new Date(),
+            positions: [],
+            distance: 0,
+            watchId: null
+        };
+
+        // Start GPS tracking if available
+        if ('geolocation' in navigator) {
+            this.currentTracking.watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    this.recordPosition(position);
+                },
+                (error) => {
+                    console.log('GPS tracking error:', error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 30000,
+                    timeout: 27000
+                }
+            );
+        }
+
+        console.log('Started tracking route:', routeId);
+    }
+
+    recordPosition(position) {
+        if (!this.currentTracking) return;
+
+        const currentPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            timestamp: new Date(),
+            accuracy: position.coords.accuracy
+        };
+
+        // Calculate distance from last position
+        const lastPos = this.currentTracking.positions[this.currentTracking.positions.length - 1];
+        if (lastPos) {
+            const distance = this.calculateDistance(
+                lastPos.lat, lastPos.lng,
+                currentPos.lat, currentPos.lng
+            );
+            this.currentTracking.distance += distance;
+        }
+
+        this.currentTracking.positions.push(currentPos);
+    }
+
+    stopRouteTracking() {
+        if (!this.currentTracking) return;
+
+        // Stop GPS tracking
+        if (this.currentTracking.watchId) {
+            navigator.geolocation.clearWatch(this.currentTracking.watchId);
+        }
+
+        // Calculate final tracking data
+        const endTime = new Date();
+        const duration = (endTime - this.currentTracking.startTime) / 1000 / 60; // minutes
+        const plannedDistance = this.calculateCompleteRouteDistance();
+
+        const trackingRecord = {
+            routeId: this.currentTracking.routeId,
+            distanceDriven: this.currentTracking.distance,
+            distancePlanned: plannedDistance,
+            startTime: this.currentTracking.startTime,
+            endTime: endTime,
+            duration: duration,
+            dateDriven: this.currentTracking.startTime.toISOString().split('T')[0],
+            earnings: this.currentTracking.distance * this.userSettings.kmRate
+        };
+
+        // Save tracking data
+        this.saveTrackingRecord(trackingRecord);
+
+        console.log('Stopped tracking route, distance driven:', this.currentTracking.distance.toFixed(2), 'km');
+
+        this.currentTracking = null;
+        return trackingRecord;
+    }
+
+    async saveTrackingRecord(record) {
+        // Save to localStorage for now
+        this.trackingData.unshift(record);
+        localStorage.setItem('routeTrackingData', JSON.stringify(this.trackingData));
+
+        // Also save to Supabase if available
+        if (window.supabaseReady && window.supabaseClient) {
+            try {
+                const { data, error } = await window.supabaseClient
+                    .from('route_tracking')
+                    .insert([{
+                        route_id: record.routeId,
+                        user_id: this.userId,
+                        distance_driven: record.distanceDriven,
+                        distance_planned: record.distancePlanned,
+                        start_time: record.startTime.toISOString(),
+                        end_time: record.endTime.toISOString(),
+                        date_driven: record.dateDriven,
+                        earnings: record.earnings,
+                        km_rate: this.userSettings.kmRate
+                    }]);
+
+                if (error) throw error;
+                console.log('Tracking record saved to Supabase');
+            } catch (error) {
+                console.error('Failed to save tracking to Supabase:', error);
+            }
+        }
+    }
+
+    loadTrackingData() {
+        const saved = localStorage.getItem('routeTrackingData');
+        if (saved) {
+            this.trackingData = JSON.parse(saved);
+        }
+
+        // Load user settings
+        const settings = localStorage.getItem('userSettings');
+        if (settings) {
+            this.userSettings = JSON.parse(settings);
+        }
+    }
+
+    async saveUserSettings() {
+        // Save to Supabase if available
+        if (window.supabaseReady && window.supabaseClient) {
+            try {
+                const { data, error } = await window.supabaseClient
+                    .from('user_settings')
+                    .upsert({
+                        user_id: this.userId,
+                        km_rate: this.userSettings.kmRate,
+                        currency: this.userSettings.currency
+                    });
+
+                if (error) throw error;
+                console.log('User settings saved to Supabase');
+            } catch (error) {
+                console.error('Failed to save user settings to Supabase:', error);
+            }
+        }
+    }
+
+    getMonthlyEarnings(month, year) {
+        const filtered = this.trackingData.filter(record => {
+            const date = new Date(record.dateDriven);
+            return date.getMonth() === month - 1 && date.getFullYear() === year;
+        });
+
+        return filtered.reduce((total, record) => total + record.earnings, 0);
+    }
+
+    getMonthlyDistance(month, year) {
+        const filtered = this.trackingData.filter(record => {
+            const date = new Date(record.dateDriven);
+            return date.getMonth() === month - 1 && date.getFullYear() === year;
+        });
+
+        return filtered.reduce((total, record) => total + record.distanceDriven, 0);
+    }
+
+    toggleTrackingSection() {
+        const content = document.getElementById('trackingContent');
+        const button = document.getElementById('toggleTrackingBtn');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            button.textContent = '▲';
+            this.updateTrackingUI();
+        } else {
+            content.style.display = 'none';
+            button.textContent = '▼';
+        }
+    }
+
+    updateTrackingUI() {
+        // Initialize month selector with current date
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        if (monthSelect && yearSelect) {
+            const now = new Date();
+            monthSelect.value = now.getMonth();
+            yearSelect.value = now.getFullYear();
+        }
+
+        this.updateTrackingStats();
+        this.updateTrackingHistory();
+
+        // Show/hide end route button
+        const endRouteBtn = document.getElementById('endRouteBtn');
+        if (endRouteBtn) {
+            endRouteBtn.style.display = this.currentTracking ? 'block' : 'none';
+        }
+    }
+
+    updateTrackingStats() {
+        const statsDiv = document.getElementById('trackingStats');
+        if (!statsDiv) return;
+
+        // Get selected month/year
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        const selectedMonth = monthSelect ? parseInt(monthSelect.value) : new Date().getMonth();
+        const selectedYear = yearSelect ? parseInt(yearSelect.value) : new Date().getFullYear();
+
+        const monthlyKm = this.getMonthlyDistance(selectedMonth + 1, selectedYear);
+        const monthlyEarnings = this.getMonthlyEarnings(selectedMonth + 1, selectedYear);
+        const totalKm = this.trackingData.reduce((sum, record) => sum + record.distanceDriven, 0);
+        const totalEarnings = this.trackingData.reduce((sum, record) => sum + record.earnings, 0);
+
+        const monthNames = ['Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
+                           'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'];
+        const selectedMonthName = monthNames[selectedMonth];
+
+        statsDiv.innerHTML = `
+            <h4>Vybraný měsíc (${selectedMonthName} ${selectedYear})</h4>
+            <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-sm);">
+                <span>Ujeté km:</span>
+                <strong>${monthlyKm.toFixed(1)} km</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-md);">
+                <span>Výdělek:</span>
+                <strong style="color: var(--success);">${monthlyEarnings.toFixed(0)} CZK</strong>
+            </div>
+
+            <h4>Celkem</h4>
+            <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-sm);">
+                <span>Celkové km:</span>
+                <strong>${totalKm.toFixed(1)} km</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span>Celkový výdělek:</span>
+                <strong style="color: var(--success);">${totalEarnings.toFixed(0)} CZK</strong>
+            </div>
+        `;
+    }
+
+    updateTrackingHistory() {
+        const historyDiv = document.getElementById('trackingHistory');
+        if (!historyDiv) return;
+
+        // Get selected month/year
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        const selectedMonth = monthSelect ? parseInt(monthSelect.value) : new Date().getMonth();
+        const selectedYear = yearSelect ? parseInt(yearSelect.value) : new Date().getFullYear();
+
+        // Filter tracking data for selected month
+        const monthData = this.trackingData.filter(record => {
+            const recordDate = new Date(record.dateDriven);
+            return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
+        });
+
+        if (monthData.length === 0) {
+            const monthNames = ['Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
+                               'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'];
+            const selectedMonthName = monthNames[selectedMonth];
+            historyDiv.innerHTML = `<p style="text-align: center; color: var(--text-secondary); margin: var(--spacing-md) 0;">Žádné trasy v ${selectedMonthName} ${selectedYear}</p>`;
+            return;
+        }
+
+        historyDiv.innerHTML = monthData.slice(0, 10).map(record => {
+            const routeName = this.savedRoutes.find(r => r.id === record.routeId)?.name || 'Neznámá trasa';
+            const date = new Date(record.dateDriven).toLocaleDateString('cs-CZ');
+
+            return `
+                <div class="tracking-entry">
+                    <div>
+                        <div class="tracking-route-name">${routeName}</div>
+                        <div class="tracking-details">${date} • ${record.distanceDriven.toFixed(1)} km</div>
+                    </div>
+                    <div class="tracking-earnings">${record.earnings.toFixed(0)} CZK</div>
+                </div>
+            `;
+        }).join('');
     }
 
     async registerServiceWorker() {
