@@ -2352,6 +2352,25 @@ class RouteOptimizer {
         }
 
         this.updateButtons();
+
+        // Fix mobile button positioning after everything is loaded
+        setTimeout(() => {
+            this.fixMobileButtonPositioning();
+        }, 100);
+    }
+
+    fixMobileButtonPositioning() {
+        // Fix button positioning on mobile devices
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const actionButtons = document.querySelector('.action-buttons');
+
+        if (isMobile && actionButtons) {
+            // Add extra padding for Android navigation bar
+            actionButtons.style.paddingBottom = 'calc(var(--spacing-sm) + 32px)';
+            actionButtons.style.marginBottom = '16px';
+
+            console.log('Applied mobile button positioning fixes');
+        }
     }
 
     async registerServiceWorker() {
