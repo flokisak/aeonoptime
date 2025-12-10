@@ -85,6 +85,8 @@
             flex-direction: column;
             height: 100vh;
             max-width: 100%;
+            /* Safe area for mobile devices */
+            padding-top: env(safe-area-inset-top);
         }
 
         .header {
@@ -722,6 +724,11 @@
             gap: var(--spacing-sm);
             box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
             border-radius: 0 0 var(--radius-large) var(--radius-large);
+            /* Safe area for mobile devices */
+            padding-bottom: max(var(--spacing-sm), env(safe-area-inset-bottom));
+            /* Ensure buttons are above mobile navigation */
+            position: relative;
+            z-index: 100;
         }
 
         /* Custom button widths */
@@ -749,7 +756,7 @@
             font-weight: 700;
             cursor: pointer;
             box-shadow: var(--shadow-4);
-            min-height: 44px;
+            min-height: 48px; /* Increased for better touch targets */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -757,6 +764,24 @@
             overflow: hidden;
             text-transform: uppercase;
             letter-spacing: 0.025em;
+            /* Ensure buttons are above mobile navigation */
+            z-index: 10;
+        }
+
+        /* Mobile-specific adjustments */
+        @media (max-width: 768px) {
+            .action-btn {
+                min-height: 52px; /* Even larger touch targets on mobile */
+                font-size: 13px;
+            }
+
+            .action-buttons {
+                padding-bottom: calc(var(--spacing-sm) + env(safe-area-inset-bottom));
+            }
+
+            .app-container {
+                padding-top: env(safe-area-inset-top);
+            }
         }
 
 
