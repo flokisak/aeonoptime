@@ -1,0 +1,33 @@
+{
+  "name": "aeon-optime",
+  "version": "1.0.0",
+  "description": "AEON Optime - Modern route optimization PWA for delivery drivers",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "serve": "npx http-server -p 8000 -c-1",
+    "dev": "npx live-server --port=8000 --open=index.html",
+    "build": "echo 'Build complete - static files ready'",
+    "preview": "npx http-server -p 8000 -c-1",
+    "setup-db": "echo 'Run the SQL in supabase-schema.sql in your Supabase SQL Editor'"
+  },
+  "keywords": [
+    "pwa",
+    "maps",
+    "route",
+    "optimization",
+    "delivery"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "live-server": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.87.1"
+  }
+}

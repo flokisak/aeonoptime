@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Test</title>
+</head>
+<body>
+    <h1>Supabase Connection Test</h1>
+    <button onclick="testConnection()">Test Connection</button>
+    <div id="result"></div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
+    <script>
+        // Initialize Supabase
+        const SUPABASE_URL = 'https://sgrvxuepflnxhhwxkqkz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNncnZ4dWVwZmxueGhod3hrcWt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNjgyMzYsImV4cCI6MjA4MDk0NDIzNn0.lHmwYOaBXU3lwRZrLbhvbPVDC0nZUT4nJpzSUnwQchg';
+
+        try {
+            if (window.supabase && window.supabase.createClient) {
+                window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                window.supabaseReady = true;
+                console.log('Supabase client initialized in test page');
+            } else {
+                console.error('Supabase library not loaded - createClient not available');
+                window.supabaseReady = false;
+            }
+        } catch (error) {
+            console.error('Error initializing Supabase client:', error);
+            window.supabaseReady = false;
+        }
+
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Testing...';
+
+            try {
+                if (!window.supabaseReady || !window.supabaseClient) {
+                    resultDiv.textContent = '❌ Supabase client not initialized';
+                    return;
+                }
+
+                const { data, error } = await window.supabaseClient
+                    .from('routes')
+                    .select('*')
+                    .limit(1);
+
+                if (error) {
+                    resultDiv.textContent = '❌ Connection failed: ' + error.message;
+                    console.error('Supabase error:', error);
+                } else {
+                    resultDiv.textContent = '✅ Connection successful! Found ' + (data ? data.length : 0) + ' routes.';
+                    console.log('Supabase data:', data);
+                }
+            } catch (error) {
+                resultDiv.textContent = '❌ Connection error: ' + error.message;
+                console.error('Connection error:', error);
+            }
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(testConnection, 1000);
+        });
+    </script>
+</body>
+</html>
