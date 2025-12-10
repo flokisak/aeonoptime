@@ -3,7 +3,7 @@
   "short_name": "AEON Optime",
   "description": "AEON Optime - Modern route optimization for delivery drivers",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#ffffff",
   "theme_color": "#4285f4",
   "orientation": "portrait",
