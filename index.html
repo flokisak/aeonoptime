@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Čeština-Čínština | Uč se čínsky hrou</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e74c3c">
+    <meta name="description" content="Gamifikovaná aplikace pro učení čínštiny pro Čechy">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🐉</span>
+                <h1>Čeština-Čínština</h1>
+            </div>
+            <div class="user-stats">
+                <div class="stat-item">
+                    <span class="stat-icon">🔥</span>
+                    <span id="streak">0</span>
+                    <span class="stat-label">dní</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">⭐</span>
+                    <span id="xp">0</span>
+                    <span class="stat-label">XP</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">💎</span>
+                    <span id="gems">0</span>
+                    <span class="stat-label">diamanty</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="home">🏠 Domů</button>
+            <button class="nav-tab" data-tab="vocabulary">📚 Slovíčka</button>
+            <button class="nav-tab" data-tab="grammar">📐 Gramatika</button>
+            <button class="nav-tab" data-tab="phrases">💬 Fráze</button>
+            <button class="nav-tab" data-tab="writing">✍️ Psaní</button>
+            <button class="nav-tab" data-tab="pronunciation">🎤 Výslovnost</button>
+            <button class="nav-tab" data-tab="profile">👤 Profil</button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Home Tab -->
+            <section id="home" class="tab-content active">
+                <div class="welcome-card">
+                    <h2>Vítej, studente! 🎓</h2>
+                    <p>Připrav se na dobrodružství s čínštinou!</p>
+                </div>
+
+                <div class="daily-challenge">
+                    <h3>📅 Denní výzva</h3>
+                    <div class="challenge-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="daily-progress" style="width: 0%"></div>
+                        </div>
+                        <span id="daily-count">0/5 lekcí dokončeno</span>
+                    </div>
+                    <button class="btn-primary" onclick="startDailyChallenge()">Začít výzvu</button>
+                </div>
+
+                <div class="quick-actions">
+                    <h3>Rychlý start</h3>
+                    <div class="action-grid">
+                        <button class="action-card" onclick="switchTab('vocabulary')">
+                            <span class="action-icon">📖</span>
+                            <span>Nová slovíčka</span>
+                        </button>
+                        <button class="action-card" onclick="switchTab('writing')">
+                            <span class="action-icon">🖌️</span>
+                            <span>Psaní znaků</span>
+                        </button>
+                        <button class="action-card" onclick="switchTab('pronunciation')">
+                            <span class="action-icon">🗣️</span>
+                            <span>Výslovnost</span>
+                        </button>
+                        <button class="action-card" onclick="startQuickQuiz()">
+                            <span class="action-icon">⚡</span>
+                            <span>Rychlý kvíz</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="achievements-preview">
+                    <h3>🏆 Nedávné úspěchy</h3>
+                    <div id="recent-achievements" class="achievements-list">
+                        <p class="empty-state">Zatím žádné úspěchy. Začni se učit!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Vocabulary Tab -->
+            <section id="vocabulary" class="tab-content">
+                <div class="vocab-header">
+                    <h2>📚 Slovní zásoba</h2>
+                    <div class="vocab-filters">
+                        <select id="vocab-category">
+                            <option value="all">Všechny kategorie</option>
+                            <option value="basics">Základy</option>
+                            <option value="numbers">Čísla</option>
+                            <option value="greetings">Pozdravy</option>
+                            <option value="food">Jídlo</option>
+                            <option value="travel">Cestování</option>
+                            <option value="family">Rodina</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="learning-mode">
+                    <div class="flashcard-container" id="flashcard-area">
+                        <div class="flashcard" id="current-flashcard">
+                            <div class="flashcard-front">
+                                <div class="chinese-character" id="fc-character">你好</div>
+                                <div class="pinyin" id="fc-pinyin">nǐ hǎo</div>
+                            </div>
+                            <div class="flashcard-back">
+                                <div class="czech-meaning" id="fc-meaning">Ahoj</div>
+                                <div class="example-sentence" id="fc-example">你好！(Ahoj!)</div>
+                            </div>
+                        </div>
+                        <div class="flashcard-controls">
+                            <button class="btn-secondary" onclick="prevCard()">← Předchozí</button>
+                            <button class="btn-toggle" onclick="toggleFlashcard()">Otočit</button>
+                            <button class="btn-secondary" onclick="nextCard()">Další →</button>
+                        </div>
+                    </div>
+
+                    <div class="vocab-practice">
+                        <h3>Procvičování</h3>
+                        <div class="practice-options">
+                            <button class="btn-practice" onclick="startVocabQuiz('recognition')">Rozpoznávání</button>
+                            <button class="btn-practice" onclick="startVocabQuiz('writing')">Psaní</button>
+                            <button class="btn-practice" onclick="startVocabQuiz('listening')">Poslech</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="vocab-list">
+                    <h3>Všechna slovíčka</h3>
+                    <div id="vocab-grid" class="vocab-grid"></div>
+                </div>
+            </section>
+
+            <!-- Writing Tab -->
+            <section id="writing" class="tab-content">
+                <div class="writing-header">
+                    <h2>✍️ Psaní čínských znaků</h2>
+                    <p>Nauč se správně psát znaky podle tahů</p>
+                </div>
+
+                <div class="character-selector">
+                    <label>Vyber znak:</label>
+                    <select id="write-character-select" onchange="loadCharacterToWrite()">
+                        <option value="">-- Vyber znak --</option>
+                    </select>
+                </div>
+
+                <div class="writing-area">
+                    <div class="character-demo">
+                        <canvas id="character-canvas" width="300" height="300"></canvas>
+                    </div>
+                    <div class="writing-controls">
+                        <button class="btn-secondary" onclick="clearCanvas()">Smazat</button>
+                        <button class="btn-secondary" onclick="showHint()">Nápověda</button>
+                        <button class="btn-primary" onclick="checkWriting()">Zkontrolovat</button>
+                    </div>
+                    <div class="stroke-order" id="stroke-order">
+                        <h4>Postup tahů:</h4>
+                        <div class="strokes-demo" id="strokes-demo"></div>
+                    </div>
+                </div>
+
+                <div class="writing-feedback" id="writing-feedback"></div>
+            </section>
+
+            <!-- Pronunciation Tab -->
+            <section id="pronunciation" class="tab-content">
+                <div class="pronunciation-header">
+                    <h2>🎤 Výslovnost a tóny</h2>
+                    <p>Zlepši svou čínskou výslovnost</p>
+                </div>
+
+                <div class="tone-practice">
+                    <h3>🎵 Procvičování tónů</h3>
+                    <div class="tone-info">
+                        <div class="tone-chart">
+                            <svg viewBox="0 0 100 60" class="tone-svg">
+                                <line x1="0" y1="50" x2="100" y2="50" stroke="#ccc" stroke-width="1"/>
+                                <text id="tone-demo-text" x="50" y="30" text-anchor="middle" font-size="20">妈</text>
+                                <path id="tone-path" d="" stroke="#e74c3c" stroke-width="2" fill="none"/>
+                            </svg>
+                        </div>
+                        <div class="tone-buttons">
+                            <button class="btn-tone" onclick="playTone(1)">1. tón</button>
+                            <button class="btn-tone" onclick="playTone(2)">2. tón</button>
+                            <button class="btn-tone" onclick="playTone(3)">3. tón</button>
+                            <button class="btn-tone" onclick="playTone(4)">4. tón</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="speaking-practice">
+                    <h3>🗣️ Mluvené procvičování</h3>
+                    <div class="word-to-speak">
+                        <div class="chinese-word" id="speak-word">你好</div>
+                        <div class="pinyin-word" id="speak-pinyin">nǐ hǎo</div>
+                        <div class="czech-translation" id="speak-meaning">Ahoj</div>
+                    </div>
+                    <div class="record-controls">
+                        <button class="btn-record" id="record-btn" onclick="toggleRecording()">
+                            <span class="record-icon">🎤</span>
+                            <span id="record-text">Nahrát</span>
+                        </button>
+                        <button class="btn-play" onclick="playNativeAudio()">🔊 Původní</button>
+                    </div>
+                    <div class="pronunciation-feedback" id="pronunciation-feedback"></div>
+                </div>
+            </section>
+
+            <!-- Profile Tab -->
+            <section id="profile" class="tab-content">
+                <div class="profile-header">
+                    <div class="avatar">🧑‍🎓</div>
+                    <h2 id="username">Student</h2>
+                    <p class="level-info">Úroveň <span id="user-level">1</span></p>
+                </div>
+
+                <div class="stats-overview">
+                    <h3>📊 Statistiky</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-value" id="total-xp">0</span>
+                            <span class="stat-label">Celkem XP</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value" id="words-learned">0</span>
+                            <span class="stat-label">Naučená slova</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value" id="lessons-completed">0</span>
+                            <span class="stat-label">Dokončené lekce</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value" id="perfect-scores">0</span>
+                            <span class="stat-label">Perfektní skóre</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="achievements-section">
+                    <h3>🏆 Úspěchy</h3>
+                    <div id="all-achievements" class="achievements-grid"></div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>⚙️ Nastavení</h3>
+                    <div class="setting-item">
+                        <label>Denní cíl (lekce):</label>
+                        <input type="number" id="daily-goal" value="5" min="1" max="20">
+                    </div>
+                    <div class="setting-item">
+                        <label>Zvukové efekty:</label>
+                        <input type="checkbox" id="sound-effects" checked>
+                    </div>
+                    <button class="btn-danger" onclick="resetProgress()">Resetovat postup</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Grammar Tab -->
+        <section id="grammar" class="tab-content">
+            <div class="grammar-header">
+                <h2>📐 Gramatika</h2>
+                <p>Nauč se čínskou gramatiku od základů po pokročilé koncepty</p>
+            </div>
+
+            <div class="grammar-categories">
+                <h3>Kategorie</h3>
+                <div class="category-filters">
+                    <button class="cat-filter active" data-cat="all">Vše</button>
+                    <button class="cat-filter" data-cat="basics">Základy</button>
+                    <button class="cat-filter" data-cat="questions">Otázky</button>
+                    <button class="cat-filter" data-cat="tenses">Časy</button>
+                    <button class="cat-filter" data-cat="particles">Částice</button>
+                    <button class="cat-filter" data-cat="comparison">Porovnání</button>
+                </div>
+            </div>
+
+            <div class="grammar-lessons-list" id="grammar-lessons-container">
+                <!-- Lekce budou vygenerovány dynamicky -->
+            </div>
+        </section>
+
+        <!-- Phrases Tab -->
+        <section id="phrases" class="tab-content">
+            <div class="phrases-header">
+                <h2>💬 Fráze a věty</h2>
+                <p>Uč se užitečné fráze pro každodenní konverzace</p>
+            </div>
+
+            <div class="phrase-categories">
+                <h3>Situace</h3>
+                <div class="phrase-filters">
+                    <button class="phrase-filter active" data-cat="all">Vše</button>
+                    <button class="phrase-filter" data-cat="basics">Základy</button>
+                    <button class="phrase-filter" data-cat="travel">Cestování</button>
+                    <button class="phrase-filter" data-cat="food">Jídlo</button>
+                    <button class="phrase-filter" data-cat="shopping">Nakupování</button>
+                    <button class="phrase-filter" data-cat="conversation">Konverzace</button>
+                </div>
+            </div>
+
+            <div class="phrases-list" id="phrases-container">
+                <!-- Fráze budou vygenerovány dynamicky -->
+            </div>
+
+            <div class="sentence-practice">
+                <h3>📝 Překladové cvičení</h3>
+                <div class="sentence-card" id="sentence-card">
+                    <div class="sentence-czech" id="sentence-czech">Načítání...</div>
+                    <textarea id="sentence-input" placeholder="Napiš překlad čínsky..."></textarea>
+                    <div class="sentence-controls">
+                        <button class="btn-secondary" onclick="showSentenceHint()">💡 Nápověda</button>
+                        <button class="btn-primary" onclick="checkSentence()">Zkontrolovat</button>
+                        <button class="btn-secondary" onclick="nextSentence()">Další věta →</button>
+                    </div>
+                    <div class="sentence-feedback" id="sentence-feedback"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quiz Modal -->
+        <div class="modal" id="quiz-modal">
+            <div class="modal-content quiz-content">
+                <div class="quiz-header">
+                    <h3 id="quiz-title">Kvíz</h3>
+                    <div class="quiz-stats">
+                        <span>Skóre: <strong id="quiz-score">0</strong></span>
+                        <span>Čas: <strong id="quiz-timer">0</strong>s</span>
+                    </div>
+                </div>
+                <div class="quiz-question" id="quiz-question">
+                    <div class="question-text">Co znamená tento znak?</div>
+                    <div class="question-chinese" id="quiz-chinese">你好</div>
+                </div>
+                <div class="quiz-options" id="quiz-options">
+                    <!-- Options will be generated dynamically -->
+                </div>
+                <div class="quiz-feedback" id="quiz-feedback"></div>
+            </div>
+        </div>
+
+        <!-- Achievement Notification -->
+        <div class="achievement-popup" id="achievement-popup">
+            <div class="achievement-icon">🏆</div>
+            <div class="achievement-text">
+                <h4 id="achievement-title">Nový úspěch!</h4>
+                <p id="achievement-desc">Popis úspěchu</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
